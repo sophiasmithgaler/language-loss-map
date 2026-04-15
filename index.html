@@ -458,6 +458,9 @@ header {
           </button>
           <span class="filter-count" id="count-official">—</span>
         </div>
+        <p style="font-size:10px;color:var(--color-muted);line-height:1.5;margin-top:6px;letter-spacing:-0.01em;">
+          Official status reflects formal legal recognition only (national or regional), sourced from Wikidata (P37). Community-edited — may not capture all cases.
+        </p>
 
         <div class="aes-pipeline" style="margin-top:14px;">
           <div class="pipeline-track" id="pipeline-segments">
@@ -520,7 +523,9 @@ let showOfficialOnly = false;
 const activeFilters = new Set(['Threatened','Shifting','Moribund','Nearly Extinct']);
 
 // ── Wikidata fetch ───────────────────────────────────────────────────
-// P220 = ISO 639-3 code, P37 = official language (of), P1813 = short name
+// P220 = ISO 639-3 code, P37 = official language (of) — strictly legal status only
+// P2936 (language used) intentionally excluded as it captures de facto use,
+// not formal legal recognition, and produces false positives (e.g. Piemontese).
 // We batch ISO codes in groups of 150 to stay within Wikidata query limits
 
 async function fetchOfficialStatus() {
@@ -539,7 +544,7 @@ async function fetchOfficialStatus() {
       SELECT ?iso (GROUP_CONCAT(DISTINCT ?placeLabel; separator="; ") AS ?places) WHERE {
         VALUES ?iso { ${values} }
         ?lang wdt:P220 ?iso .
-        { ?place wdt:P37 ?lang . } UNION { ?place wdt:P2936 ?lang . }
+        ?place wdt:P37 ?lang .
         ?place rdfs:label ?placeLabel .
         FILTER(LANG(?placeLabel) = "en")
       }
