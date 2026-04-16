@@ -58,7 +58,7 @@ html, body {
 .animate-drill-in    { animation: drill-in   380ms cubic-bezier(0.32,0.72,0,1) both; }
 .animate-popup-enter { animation: popup-enter 200ms cubic-bezier(0.34,1.56,0.64,1) both; }
 
-.app { display: flex; flex-direction: column; height: 100vh; }
+.app { display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
 
 header {
   height: 48px;
@@ -144,7 +144,7 @@ header {
   flex-shrink: 0;
 }
 
-.main { display: flex; flex: 1; overflow: hidden; }
+.main { display: flex; flex: 1; overflow: hidden; min-height: 0; }
 
 .sidebar {
   width: 320px;
@@ -311,7 +311,7 @@ header {
 }
 .glottolog-btn:hover { box-shadow: var(--shadow-float); background: #fff; }
 
-#map { flex: 1; background: #EEECEA; }
+#map { flex: 1; background: #EEECEA; min-height: 0; }
 .leaflet-container { background: #EEECEA !important; font-family: 'Inter', ui-sans-serif, sans-serif; }
 .leaflet-tile { filter: saturate(0.3) brightness(1.05); }
 .leaflet-control-zoom { border: none !important; box-shadow: var(--shadow-float) !important; }
@@ -380,6 +380,68 @@ header {
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
 }
+
+/* ── Tooltip explainer ───────────────────────────────────────── */
+.has-tooltip { position: relative; }
+.has-tooltip .tooltip-box {
+  display: none;
+  position: absolute;
+  left: 0; top: calc(100% + 6px);
+  width: 224px;
+  background: rgba(255,255,255,0.98);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(0,0,0,0.07);
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.1), 0 2px 8px rgba(0,0,0,0.05);
+  padding: 10px 12px;
+  font-size: 11.5px;
+  line-height: 1.55;
+  color: var(--color-ink);
+  letter-spacing: -0.01em;
+  z-index: 999;
+  pointer-events: none;
+  font-weight: 400;
+  text-transform: none;
+}
+.has-tooltip:hover .tooltip-box { display: block; }
+.tooltip-box .tooltip-title {
+  font-weight: 600;
+  font-size: 10px;
+  margin-bottom: 5px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-muted);
+}
+.tooltip-underline {
+  border-bottom: 1px dashed rgba(0,0,0,0.3);
+  padding-bottom: 1px;
+  cursor: help;
+}
+
+/* ── Source badge ────────────────────────────────────────────── */
+.src-badge {
+  display: inline-flex; align-items: center;
+  font-size: 10px; font-weight: 500; letter-spacing: 0.02em;
+  padding: 2px 7px; border-radius: 9999px;
+  border: 1px solid rgba(0,0,0,0.08); flex-shrink: 0;
+}
+.src-glottolog { background: #F0F4FF; color: #3B5BDB; }
+.src-unesco    { background: #FFF4E6; color: #D9480F; }
+.src-both      { background: #F3FBF4; color: #2B8A3E; }
+.source-filter-row { display: flex; align-items: center; justify-content: space-between; padding: 6px 0; }
+
+/* ── Documentation filter ────────────────────────────────────── */
+.doc-filter-section { padding: 14px 16px; border-bottom: 1px solid var(--color-hairline); }
+.doc-toggle {
+  display: flex; align-items: center; gap: 7px;
+  border: none; background: transparent; font-family: inherit;
+  padding: 4px 0; cursor: pointer; transition: opacity 0.15s; width: 100%; text-align: left;
+}
+.doc-toggle.inactive { opacity: 0.35; }
+.doc-swatch { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
+.doc-label { font-size: 12px; color: var(--color-ink); letter-spacing: -0.01em; flex: 1; }
+.doc-count { font-size: 11px; color: var(--color-muted); font-variant-numeric: tabular-nums; }
+
 </style>
 </head>
 <body>
