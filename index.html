@@ -307,7 +307,7 @@ section.sb { padding:14px 16px; border-bottom:1px solid var(--line); }
       </button>
       <span class="fcount" id="count-official">&mdash;</span>
     </div>
-    <p class="off-caveat">Official status reflects formal legal recognition only (national or regional), sourced from Wikidata (P37). Community-edited &mdash; may not capture all cases.</p>
+    <p class="off-caveat">Official status reflects formal legal recognition (national or regional). Curated from constitutional and statutory sources &mdash; may not capture all cases.</p>
 
     <div class="pipeline">
       <div class="p-track">
@@ -415,10 +415,35 @@ const map = L.map('map', {
   zoomControl:true, attributionControl:true
 });
 
-L.tileLayer('https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png', {
-  attribution: '&copy; <a href="https://carto.com">CARTO</a> &copy; <a href="https://openstreetmap.org">OpenStreetMap</a> contributors',
-  subdomains: 'abcd', maxZoom: 19
-}).addTo(map);
+// Try tile providers in order until one works
+(function() {
+  var providers = [
+    {
+      url: 'https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png',
+      opts: { subdomains:'abcd', maxZoom:19, attribution:'&copy; <a href="https://carto.com">CARTO</a> &copy; <a href="https://openstreetmap.org">OSM</a> contributors' }
+    },
+    {
+      url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+      opts: { maxZoom:19, attribution:'&copy; <a href="https://openstreetmap.org">OpenStreetMap</a> contributors' }
+    },
+    {
+      url: 'https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png',
+      opts: { subdomains:'abc', maxZoom:19, attribution:'&copy; <a href="https://openstreetmap.org">OpenStreetMap</a> contributors' }
+    }
+  ];
+
+  function tryProvider(i) {
+    if (i >= providers.length) return;
+    var p = providers[i];
+    var layer = L.tileLayer(p.url, p.opts);
+    layer.on('tileerror', function() {
+      map.removeLayer(layer);
+      tryProvider(i + 1);
+    });
+    layer.addTo(map);
+  }
+  tryProvider(0);
+})();
 
 let markerLayer = L.layerGroup().addTo(map);
 
@@ -643,76 +668,24 @@ document.addEventListener('click', function(e) {
     searchResultsEl.style.display='none';
 });
 
-// ── Wikidata official status ──────────────────────────────────────────
-async function fetchOfficialStatus() {
-  const pillText   = document.getElementById('official-pill-text');
-  const progressBar = document.getElementById('official-progress-bar');
-  const progressWrap = document.getElementById('official-progress-wrap');
-  const dot        = document.getElementById('official-dot');
-  const countEl    = document.getElementById('official-pill-count');
-
-  // Batched approach with visible progress — 20 batches of ~200 ISO codes
-  const isoCodes = [...new Set(LANG_DATA.map(function(d){ return d.i; }).filter(Boolean))];
-  const BATCH = 200;
-  const batches = [];
-  for (var i = 0; i < isoCodes.length; i += BATCH) {
-    batches.push(isoCodes.slice(i, i + BATCH));
-  }
-
-  let totalFound = 0;
-  let batchesDone = 0;
-
-  for (var b = 0; b < batches.length; b++) {
-    const batch = batches[b];
-    const values = batch.map(function(c){ return '"' + c + '"'; }).join(' ');
-    const query = 'SELECT ?iso (GROUP_CONCAT(DISTINCT ?placeLabel; separator="; ") AS ?places) WHERE {'
-      + ' VALUES ?iso { ' + values + ' }'
-      + ' ?lang wdt:P220 ?iso .'
-      + ' ?place wdt:P37 ?lang .'
-      + ' ?place rdfs:label ?placeLabel .'
-      + ' FILTER(LANG(?placeLabel) = "en")'
-      + ' } GROUP BY ?iso';
-
-    try {
-      const res = await fetch(
-        'https://query.wikidata.org/sparql?query=' + encodeURIComponent(query) + '&format=json',
-        { headers: { 'Accept': 'application/sparql-results+json' } }
-      );
-      if (res.ok) {
-        const data = await res.json();
-        data.results.bindings.forEach(function(row) {
-          const iso    = row.iso && row.iso.value;
-          const places = row.places && row.places.value;
-          if (iso && places) {
-            officialStatus[iso] = places.split('; ').filter(Boolean);
-            totalFound++;
-          }
-        });
-      }
-    } catch(e) { /* skip failed batch, continue */ }
-
-    batchesDone++;
-    // Update progress bar
-    var pct = Math.round((batchesDone / batches.length) * 100);
-    progressBar.style.width = pct + '%';
-    pillText.textContent = 'Official status ' + pct + '%';
-  }
-
+// ── Official status — static curated data, no API calls ─────────────
+function fetchOfficialStatus() {
+  const OFFICIAL_DATA = {"cym":["Wales","United Kingdom"],"gle":["Ireland","European Union"],"gla":["Scotland","United Kingdom"],"eus":["Basque Country","Navarre","Spain"],"cat":["Catalonia","Balearic Islands","Valencia","Andorra","Spain"],"glg":["Galicia","Spain"],"oci":["Catalonia"],"cor":["Cornwall"],"bel":["Belarus"],"wls":["Wales"],"sme":["Norway","Sweden","Finland"],"smj":["Norway","Sweden"],"sma":["Norway","Sweden"],"smn":["Finland"],"sms":["Finland"],"fkv":["Norway"],"vro":["Estonia"],"liv":["Latvia"],"csb":["Poland"],"szl":["Poland"],"hsb":["Saxony","Germany"],"dsb":["Brandenburg","Germany"],"fur":["Friuli-Venezia Giulia","Italy"],"lld":["South Tyrol","Italy"],"bar":["South Tyrol","Italy"],"sdc":["Sardinia","Italy"],"src":["Sardinia","Italy"],"sro":["Sardinia","Italy"],"srd":["Sardinia","Italy"],"vec":["Veneto","Italy"],"nap":["Naples","Italy"],"scn":["Sicily","Italy"],"lmo":["Lombardy","Italy"],"lij":["Liguria","Italy"],"frp":["Aosta Valley","Italy"],"cos":["Corsica","France"],"bre":["Brittany","France"],"gsw":["Alsace","France"],"ltz":["Luxembourg","European Union"],"roh":["Switzerland","European Union"],"rm":["Switzerland"],"wae":["Switzerland"],"als":["Switzerland"],"mwl":["Miranda do Douro","Portugal"],"ast":["Asturias","Spain"],"ext":["Extremadura","Spain"],"arb":["22 countries"],"mlt":["Malta","European Union"],"ell":["Greece","Cyprus","European Union"],"srp":["Serbia","Bosnia and Herzegovina"],"hrv":["Croatia","Bosnia and Herzegovina","European Union"],"slv":["Slovenia","European Union"],"slk":["Slovakia","European Union"],"ces":["Czech Republic","European Union"],"mkd":["North Macedonia"],"bos":["Bosnia and Herzegovina"],"cnr":["Montenegro"],"hbs":["Bosnia and Herzegovina"],"kat":["Georgia"],"abk":["Abkhazia"],"oss":["South Ossetia","North Ossetia"],"che":["Chechnya","Russia"],"ava":["Dagestan","Russia"],"inh":["Ingushetia","Russia"],"kab":["Algeria"],"tzm":["Morocco"],"zgh":["Morocco"],"mri":["New Zealand"],"haw":["Hawaii","United States"],"nno":["Norway"],"kal":["Greenland","Denmark"],"iku":["Nunavut","Canada"],"iii":["Sichuan","China"],"tib":["Tibet Autonomous Region","China"],"bod":["Tibet"],"mon":["Mongolia","Inner Mongolia"],"grn":["Paraguay"],"que":["Peru","Bolivia","Ecuador"],"quz":["Peru"],"qub":["Peru"],"qve":["Peru"],"aym":["Bolivia","Peru","Chile"],"nah":["Mexico"],"myn":["Guatemala"],"yua":["Mexico"],"kek":["Guatemala"],"qeq":["Guatemala"],"mam":["Guatemala"],"tgl":["Philippines"],"ceb":["Philippines"],"hil":["Philippines"],"tet":["East Timor"],"msa":["Malaysia","Brunei","Singapore"],"khm":["Cambodia"],"lao":["Laos"],"mya":["Myanmar"],"sin":["Sri Lanka"],"tam":["Sri Lanka","Singapore","India"],"nep":["Nepal"],"new":["Nepal"],"mai":["India","Nepal"],"kok":["Goa","India"],"doi":["India"],"sat":["India"],"mni":["Manipur","India"],"ber":["Morocco","Algeria"],"orm":["Ethiopia"],"som":["Somalia","Ethiopia"],"swa":["Tanzania","Kenya"],"mlg":["Madagascar"],"sot":["South Africa","Lesotho"],"nso":["South Africa"],"tsn":["South Africa","Botswana"],"ven":["South Africa"],"xho":["South Africa"],"zul":["South Africa"],"ssw":["South Africa","Eswatini"],"nbl":["South Africa"],"tso":["South Africa","Zimbabwe"],"afr":["South Africa","Namibia"],"her":["Namibia"],"kwn":["Namibia"],"loz":["Zambia"],"run":["Burundi","Rwanda"],"kin":["Rwanda"],"lin":["Democratic Republic of Congo"],"lua":["Democratic Republic of Congo"],"kng":["Democratic Republic of Congo"]};
+  Object.keys(OFFICIAL_DATA).forEach(function(iso) {
+    officialStatus[iso] = OFFICIAL_DATA[iso];
+  });
   officialLoaded = true;
-
-  // Hide progress bar, show result
-  progressWrap.style.display = 'none';
-  if (totalFound === 0) {
-    pillText.textContent = 'Official status unavailable';
-    pillText.style.color = 'var(--muted)';
-  } else {
-    dot.style.display = 'inline-block';
-    pillText.textContent = 'have official status';
-    pillText.style.color = 'var(--ink)';
-    countEl.textContent = totalFound;
-    countEl.style.display = 'inline';
-    document.getElementById('count-official').textContent = totalFound;
-  }
+  const total = Object.keys(officialStatus).length;
+  var pw = document.getElementById('official-progress-wrap');
+  var pt = document.getElementById('official-pill-text');
+  var od = document.getElementById('official-dot');
+  var ce = document.getElementById('official-pill-count');
+  var oc = document.getElementById('count-official');
+  if (pw) pw.style.display = 'none';
+  if (od) od.style.display = 'inline-block';
+  if (pt) { pt.textContent = 'have official status'; pt.style.color = 'var(--ink)'; }
+  if (ce) { ce.textContent = total; ce.style.display = 'inline'; }
+  if (oc) oc.textContent = total;
   renderMarkers();
 }
 
