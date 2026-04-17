@@ -8,7 +8,6 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/topojson-client@3/dist/topojson-client.min.js"></script>
 <style>
 :root {
   --bg: #FAFAF8;
@@ -70,7 +69,7 @@ header {
 }
 .pill .count { font-weight:600; font-variant-numeric:tabular-nums; }
 .pill .lbl   { color:var(--muted); }
-.spinner { width:8px; height:8px; border-radius:50%; border:1.5px solid rgba(0,0,0,0.1); border-top-color:var(--muted); animation:spin 0.8s linear infinite; flex-shrink:0; }
+
 .off-dot { width:8px; height:8px; border-radius:50%; border:2px solid var(--official); flex-shrink:0; }
 
 /* Layout */
@@ -246,9 +245,15 @@ section.sb { padding:14px 16px; border-bottom:1px solid var(--line); }
 <header>
   <span class="h-title">LANGUAGE LOSS</span>
   <div class="h-right">
-    <div class="pill" id="official-pill">
-      <span class="spinner" id="official-spinner"></span>
-      <span id="official-pill-text">Loading official status&hellip;</span>
+    <div class="pill" id="official-pill" style="flex-direction:column;align-items:flex-start;gap:3px;padding:6px 12px;min-width:180px;">
+      <div style="display:flex;align-items:center;gap:6px;width:100%;">
+        <span class="off-dot" id="official-dot" style="display:none;"></span>
+        <span id="official-pill-text" style="font-size:11px;color:var(--muted);">Official status</span>
+        <span id="official-pill-count" style="font-size:11px;font-weight:600;margin-left:auto;display:none;"></span>
+      </div>
+      <div id="official-progress-wrap" style="width:100%;height:2px;background:rgba(0,0,0,0.06);border-radius:9999px;overflow:hidden;">
+        <div id="official-progress-bar" style="height:100%;width:0%;background:var(--official);border-radius:9999px;transition:width 0.3s ease;"></div>
+      </div>
     </div>
     <div class="pill">
       <span class="live-dot"></span>
@@ -410,20 +415,15 @@ const map = L.map('map', {
   zoomControl:true, attributionControl:true
 });
 
+L.tileLayer('https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png', {
+  attribution: '&copy; <a href="https://carto.com">CARTO</a> &copy; <a href="https://openstreetmap.org">OpenStreetMap</a> contributors',
+  subdomains: 'abcd', maxZoom: 19
+}).addTo(map);
+
 let markerLayer = L.layerGroup().addTo(map);
 
-fetch('https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json')
-  .then(r => r.json())
-  .then(world => {
-    const countries = topojson.feature(world, world.objects.countries);
-    L.geoJSON(countries, {
-      style: { fillColor:'#E8E5DE', fillOpacity:1, color:'#E8E5DE', weight:0.5 },
-      smoothFactor: 1.5
-    }).addTo(map);
-    renderMarkers();
-    setTimeout(() => map.invalidateSize(), 200);
-  })
-  .catch(() => { renderMarkers(); setTimeout(() => map.invalidateSize(), 200); });
+renderMarkers();
+setTimeout(() => map.invalidateSize(), 200);
 
 // ── Icons ─────────────────────────────────────────────────────────────
 function makeIcon(d) {
@@ -645,49 +645,72 @@ document.addEventListener('click', function(e) {
 
 // ── Wikidata official status ──────────────────────────────────────────
 async function fetchOfficialStatus() {
-  const query = `
-    SELECT ?iso (GROUP_CONCAT(DISTINCT ?placeLabel; separator="; ") AS ?places) WHERE {
-      ?lang wdt:P220 ?iso .
-      ?place wdt:P37 ?lang .
-      ?place rdfs:label ?placeLabel .
-      FILTER(LANG(?placeLabel) = "en")
-      FILTER(STRLEN(?iso) = 3)
-    }
-    GROUP BY ?iso
-  `;
-  const pill     = document.getElementById('official-pill');
-  const spinner  = document.getElementById('official-spinner');
-  const pillText = document.getElementById('official-pill-text');
-  let totalFound = 0;
+  const pillText   = document.getElementById('official-pill-text');
+  const progressBar = document.getElementById('official-progress-bar');
+  const progressWrap = document.getElementById('official-progress-wrap');
+  const dot        = document.getElementById('official-dot');
+  const countEl    = document.getElementById('official-pill-count');
 
-  try {
-    const controller = new AbortController();
-    const timer = setTimeout(function(){ controller.abort(); }, 12000);
-    const res = await fetch(
-      'https://query.wikidata.org/sparql?query=' + encodeURIComponent(query) + '&format=json',
-      { headers:{'Accept':'application/sparql-results+json'}, signal:controller.signal }
-    );
-    clearTimeout(timer);
-    if (res.ok) {
-      const data = await res.json();
-      data.results.bindings.forEach(function(row) {
-        const iso    = row.iso && row.iso.value;
-        const places = row.places && row.places.value;
-        if (iso && places) { officialStatus[iso] = places.split('; ').filter(Boolean); totalFound++; }
-      });
-    }
-  } catch(e) { /* timeout or network — fail silently */ }
+  // Batched approach with visible progress — 20 batches of ~200 ISO codes
+  const isoCodes = [...new Set(LANG_DATA.map(function(d){ return d.i; }).filter(Boolean))];
+  const BATCH = 200;
+  const batches = [];
+  for (var i = 0; i < isoCodes.length; i += BATCH) {
+    batches.push(isoCodes.slice(i, i + BATCH));
+  }
+
+  let totalFound = 0;
+  let batchesDone = 0;
+
+  for (var b = 0; b < batches.length; b++) {
+    const batch = batches[b];
+    const values = batch.map(function(c){ return '"' + c + '"'; }).join(' ');
+    const query = 'SELECT ?iso (GROUP_CONCAT(DISTINCT ?placeLabel; separator="; ") AS ?places) WHERE {'
+      + ' VALUES ?iso { ' + values + ' }'
+      + ' ?lang wdt:P220 ?iso .'
+      + ' ?place wdt:P37 ?lang .'
+      + ' ?place rdfs:label ?placeLabel .'
+      + ' FILTER(LANG(?placeLabel) = "en")'
+      + ' } GROUP BY ?iso';
+
+    try {
+      const res = await fetch(
+        'https://query.wikidata.org/sparql?query=' + encodeURIComponent(query) + '&format=json',
+        { headers: { 'Accept': 'application/sparql-results+json' } }
+      );
+      if (res.ok) {
+        const data = await res.json();
+        data.results.bindings.forEach(function(row) {
+          const iso    = row.iso && row.iso.value;
+          const places = row.places && row.places.value;
+          if (iso && places) {
+            officialStatus[iso] = places.split('; ').filter(Boolean);
+            totalFound++;
+          }
+        });
+      }
+    } catch(e) { /* skip failed batch, continue */ }
+
+    batchesDone++;
+    // Update progress bar
+    var pct = Math.round((batchesDone / batches.length) * 100);
+    progressBar.style.width = pct + '%';
+    pillText.textContent = 'Official status ' + pct + '%';
+  }
 
   officialLoaded = true;
-  spinner.style.display = 'none';
 
+  // Hide progress bar, show result
+  progressWrap.style.display = 'none';
   if (totalFound === 0) {
     pillText.textContent = 'Official status unavailable';
+    pillText.style.color = 'var(--muted)';
   } else {
-    const dot = document.createElement('span');
-    dot.className = 'off-dot';
-    pill.insertBefore(dot, pillText);
-    pillText.textContent = totalFound + ' have official status';
+    dot.style.display = 'inline-block';
+    pillText.textContent = 'have official status';
+    pillText.style.color = 'var(--ink)';
+    countEl.textContent = totalFound;
+    countEl.style.display = 'inline';
     document.getElementById('count-official').textContent = totalFound;
   }
   renderMarkers();
