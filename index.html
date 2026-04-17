@@ -8,6 +8,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/topojson-client@3/dist/topojson-client.min.js"></script>
 <style>
 :root {
   --color-bg: #FAFAF8;
@@ -311,9 +312,9 @@ header {
 }
 .glottolog-btn:hover { box-shadow: var(--shadow-float); background: #fff; }
 
-#map { flex: 1; background: #EEECEA; min-height: 0; }
-.leaflet-container { background: #EEECEA !important; font-family: 'Inter', ui-sans-serif, sans-serif; }
-.leaflet-tile { filter: saturate(0.35) brightness(1.02) contrast(0.95); }
+#map { flex: 1; background: #E8E6E0; min-height: 0; }
+.leaflet-container { background: #E8E6E0 !important; font-family: 'Inter', ui-sans-serif, sans-serif; }
+
 .leaflet-control-zoom { border: none !important; box-shadow: var(--shadow-float) !important; }
 .leaflet-control-zoom a {
   background: rgba(255,255,255,0.9) !important;
@@ -665,36 +666,40 @@ const activeFilters = new Set(['Threatened','Shifting','Moribund','Nearly Extinc
 // We batch ISO codes in groups of 150 to stay within Wikidata query limits
 
 async function fetchOfficialStatus() {
-  const isoCodes = [...new Set(LANG_DATA.map(d => d.i).filter(Boolean))];
-  const BATCH = 150;
-  const batches = [];
-  for (let i = 0; i < isoCodes.length; i += BATCH) {
-    batches.push(isoCodes.slice(i, i + BATCH));
+  // Use a single broad query instead of 20 batched requests —
+  // much faster and avoids the permanent spinner on slow connections.
+  // 10 second timeout: if Wikidata doesn't respond, fail gracefully.
+  const TIMEOUT_MS = 10000;
+
+  function fetchWithTimeout(url, opts, ms) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), ms);
+    return fetch(url, { ...opts, signal: controller.signal })
+      .finally(() => clearTimeout(timer));
   }
+
+  // One query that fetches ALL languages with official status in one go
+  const query = `
+    SELECT ?iso (GROUP_CONCAT(DISTINCT ?placeLabel; separator="; ") AS ?places) WHERE {
+      ?lang wdt:P220 ?iso .
+      ?place wdt:P37 ?lang .
+      ?place rdfs:label ?placeLabel .
+      FILTER(LANG(?placeLabel) = "en")
+      FILTER(STRLEN(?iso) = 3)
+    }
+    GROUP BY ?iso
+  `;
 
   let totalFound = 0;
 
-  for (const batch of batches) {
-    const values = batch.map(c => `"${c}"`).join(' ');
-    const query = `
-      SELECT ?iso (GROUP_CONCAT(DISTINCT ?placeLabel; separator="; ") AS ?places) WHERE {
-        VALUES ?iso { ${values} }
-        ?lang wdt:P220 ?iso .
-        ?place wdt:P37 ?lang .
-        ?place rdfs:label ?placeLabel .
-        FILTER(LANG(?placeLabel) = "en")
-      }
-      GROUP BY ?iso
-    `;
+  try {
+    const url = 'https://query.wikidata.org/sparql?query=' +
+      encodeURIComponent(query) + '&format=json';
+    const res = await fetchWithTimeout(url, {
+      headers: { 'Accept': 'application/sparql-results+json' }
+    }, TIMEOUT_MS);
 
-    try {
-      const url = 'https://query.wikidata.org/sparql?query=' +
-        encodeURIComponent(query) + '&format=json';
-      const res = await fetch(url, {
-        headers: { 'Accept': 'application/sparql-results+json',
-                   'User-Agent': 'LanguageLossMap/1.0' }
-      });
-      if (!res.ok) continue;
+    if (res.ok) {
       const data = await res.json();
       for (const row of data.results.bindings) {
         const iso = row.iso?.value;
@@ -704,9 +709,9 @@ async function fetchOfficialStatus() {
           totalFound++;
         }
       }
-    } catch(e) {
-      // silently skip failed batches
     }
+  } catch(e) {
+    // Timeout or network error — fail silently, map still works fine
   }
 
   officialLoaded = true;
@@ -716,6 +721,11 @@ async function fetchOfficialStatus() {
   const spinner = document.getElementById('official-spinner');
   const pillText = document.getElementById('official-pill-text');
   spinner.style.display = 'none';
+
+  if (totalFound === 0) {
+    pillText.textContent = 'Official status unavailable';
+    return;
+  }
 
   const dot = document.createElement('span');
   dot.className = 'off-dot';
@@ -734,11 +744,26 @@ const map = L.map('map', {
   center: [20, 15], zoom: 2, minZoom: 2, maxZoom: 12,
   zoomControl: true, attributionControl: true
 });
-L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-  attribution: '© <a href="https://openstreetmap.org">OpenStreetMap</a> contributors · Language data: <a href="https://glottolog.org">Glottolog 5.2</a> (CC BY 4.0)',
-  maxZoom: 19,
-  crossOrigin: true
-}).addTo(map);
+// Country polygons — loads in one request, renders instantly, no tile server
+fetch('https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json')
+  .then(r => r.json())
+  .then(world => {
+    const countries = topojson.feature(world, world.objects.countries);
+    L.geoJSON(countries, {
+      style: {
+        fillColor: '#E4E1DA',
+        fillOpacity: 1,
+        color: '#C4C0B6',
+        weight: 0.6
+      }
+    }).addTo(map);
+    // Land is rendered — now put markers on top
+    renderMarkers();
+  })
+  .catch(() => {
+    // No country outlines but dots still show
+    renderMarkers();
+  });
 
 let markerLayer = L.layerGroup().addTo(map);
 
@@ -819,7 +844,7 @@ function updatePipeline() {
   });
 }
 
-renderMarkers();
+// renderMarkers() called inside country fetch callback above
 
 // Force map to fill its container after render
 setTimeout(() => map.invalidateSize(), 300);
