@@ -313,7 +313,7 @@ header {
 
 #map { flex: 1; background: #EEECEA; min-height: 0; }
 .leaflet-container { background: #EEECEA !important; font-family: 'Inter', ui-sans-serif, sans-serif; }
-.leaflet-tile { filter: saturate(0.3) brightness(1.05); }
+.leaflet-tile { filter: saturate(0.35) brightness(1.02) contrast(0.95); }
 .leaflet-control-zoom { border: none !important; box-shadow: var(--shadow-float) !important; }
 .leaflet-control-zoom a {
   background: rgba(255,255,255,0.9) !important;
@@ -734,9 +734,10 @@ const map = L.map('map', {
   center: [20, 15], zoom: 2, minZoom: 2, maxZoom: 12,
   zoomControl: true, attributionControl: true
 });
-L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-  attribution: '© <a href="https://carto.com">CARTO</a> · © <a href="https://openstreetmap.org">OpenStreetMap</a> contributors · Language data: <a href="https://glottolog.org">Glottolog 5.2</a> (CC BY 4.0)',
-  subdomains: 'abcd', maxZoom: 20
+L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: '© <a href="https://openstreetmap.org">OpenStreetMap</a> contributors · Language data: <a href="https://glottolog.org">Glottolog 5.2</a> (CC BY 4.0)',
+  maxZoom: 19,
+  crossOrigin: true
 }).addTo(map);
 
 let markerLayer = L.layerGroup().addTo(map);
@@ -819,6 +820,9 @@ function updatePipeline() {
 }
 
 renderMarkers();
+
+// Force map to fill its container after render
+setTimeout(() => map.invalidateSize(), 300);
 
 // ── Popup ────────────────────────────────────────────────────────────
 function buildPopupContent(d) {
