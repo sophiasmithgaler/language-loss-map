@@ -744,6 +744,8 @@ const map = L.map('map', {
   center: [20, 15], zoom: 2, minZoom: 2, maxZoom: 12,
   zoomControl: true, attributionControl: true
 });
+let markerLayer = L.layerGroup().addTo(map);
+
 // Country polygons — loads in one request, renders instantly, no tile server
 fetch('https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json')
   .then(r => r.json())
@@ -751,21 +753,21 @@ fetch('https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json')
     const countries = topojson.feature(world, world.objects.countries);
     L.geoJSON(countries, {
       style: {
-        fillColor: '#E4E1DA',
+        fillColor: '#E8E5DE',
         fillOpacity: 1,
-        color: '#C4C0B6',
-        weight: 0.6
-      }
+        color: '#E8E5DE',
+        weight: 0.5,
+        stroke: true
+      },
+      smoothFactor: 1.5
     }).addTo(map);
-    // Land is rendered — now put markers on top
     renderMarkers();
+    setTimeout(() => map.invalidateSize(), 300);
   })
   .catch(() => {
-    // No country outlines but dots still show
     renderMarkers();
+    setTimeout(() => map.invalidateSize(), 300);
   });
-
-let markerLayer = L.layerGroup().addTo(map);
 
 function makeIcon(d) {
   const hex = STATUS_HEX[d.s];
