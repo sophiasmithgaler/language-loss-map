@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Research Feed — Linguicide & Linguistic Rights</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #FAFAF8;
+  --card: #FFFFFF;
+  --ink: #1D1D1F;
+  --muted: #86868B;
+  --line: rgba(0,0,0,0.06);
+  --shadow-md: 0 8px 32px rgba(0,0,0,0.08), 0 2px 8px rgba(0,0,0,0.04);
+  --c-arxiv:   #B5520A;
+  --c-scholar: #1967D2;
+  --c-ldc:     #1E7E34;
+  --c-alerts:  #C0392B;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: 'Inter', ui-sans-serif, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  max-width: 780px;
+  margin: 0 auto;
+  padding: 32px 20px 48px;
+}
+@keyframes fade-rise { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
+@keyframes spin { to{transform:rotate(360deg)} }
+
+.feed-header { display:flex; align-items:baseline; justify-content:space-between; margin-bottom:18px; flex-wrap:wrap; gap:8px; }
+.feed-title  { font-size:15px; font-weight:600; letter-spacing:-0.02em; }
+.feed-sub    { font-size:11px; color:var(--muted); letter-spacing:-0.01em; }
+
+.filter-bar  { display:flex; gap:6px; margin-bottom:20px; flex-wrap:wrap; align-items:center; }
+.flabel      { font-size:11px; color:var(--muted); margin-right:2px; }
+.fpill {
+  display:inline-flex; align-items:center; gap:5px;
+  padding:5px 11px; border-radius:9999px;
+  font-size:11px; font-weight:500; letter-spacing:-0.01em;
+  cursor:pointer; border:1px solid var(--line);
+  background:var(--card); color:var(--muted);
+  transition:all 0.15s; user-select:none; white-space:nowrap;
+  font-family:inherit;
+}
+.fpill.active  { background:var(--ink); color:#fff; border-color:var(--ink); }
+.fpill:hover:not(.active) { border-color:rgba(0,0,0,0.18); color:var(--ink); }
+.fdot { width:6px; height:6px; border-radius:50%; flex-shrink:0; }
+
+.loading-row { display:flex; align-items:center; gap:8px; font-size:12px; color:var(--muted); padding:6px 0; }
+.spinner { width:12px; height:12px; border-radius:50%; border:1.5px solid rgba(0,0,0,0.08); border-top-color:var(--muted); animation:spin 0.7s linear infinite; flex-shrink:0; }
+.sdot { width:7px; height:7px; border-radius:50%; flex-shrink:0; display:inline-block; }
+
+.stats-bar { display:flex; align-items:center; gap:16px; margin-bottom:14px; }
+.stat { font-size:11px; color:var(--muted); }
+.stat strong { color:var(--ink); font-weight:600; }
+
+.results { display:flex; flex-direction:column; gap:10px; }
+.rcard {
+  background:var(--card); border:1px solid var(--line); border-radius:16px;
+  padding:16px 18px; text-decoration:none; display:block;
+  transition:box-shadow 0.15s, transform 0.15s, border-color 0.15s;
+  animation:fade-rise 350ms cubic-bezier(0.32,0.72,0,1) both;
+}
+.rcard:hover { box-shadow:var(--shadow-md); transform:translateY(-1px); border-color:rgba(0,0,0,0.1); }
+.rcard-top { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:7px; }
+.rsrc { display:inline-flex; align-items:center; gap:5px; font-size:10px; font-weight:500; letter-spacing:0.03em; text-transform:uppercase; color:var(--muted); }
+.rdate { font-size:11px; color:var(--muted); font-variant-numeric:tabular-nums; flex-shrink:0; }
+.rtitle { font-size:14px; font-weight:600; color:var(--ink); line-height:1.35; letter-spacing:-0.01em; margin-bottom:4px; }
+.rauthors { font-size:11px; color:var(--muted); margin-bottom:6px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.rabstract { font-size:12px; color:var(--muted); line-height:1.65; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; margin-bottom:10px; }
+.rfoot { display:flex; align-items:center; justify-content:space-between; padding-top:10px; border-top:1px solid var(--line); }
+.rjournal { font-size:11px; color:var(--muted); font-style:italic; max-width:65%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.rarrow { font-size:11px; color:var(--muted); flex-shrink:0; transition:transform 0.15s, color 0.15s; }
+.rcard:hover .rarrow { transform:translateX(3px); color:var(--ink); }
+
+.empty { font-size:13px; color:var(--muted); padding:32px 0; text-align:center; }
+.notice { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:14px 16px; font-size:12px; color:var(--muted); line-height:1.65; margin-bottom:16px; }
+.notice strong { color:var(--ink); }
+.notice a { color:var(--ink); }
+.notice code { background:var(--bg); border:1px solid var(--line); border-radius:4px; padding:1px 5px; font-size:11px; color:var(--ink); }
+</style>
+</head>
+<body>
+
+<div class="feed-header">
+  <span class="feed-title">Research Feed</span>
+  <span class="feed-sub">Linguicide &middot; Linguistic rights &middot; Endangered languages</span>
+</div>
+
+<div class="notice" id="alerts-notice" style="display:none">
+  <strong>&#128279; Add Google Alerts:</strong> Go to <a href="https://www.google.com/alerts" target="_blank">google.com/alerts</a>,
+  create alerts for <code>linguicide</code> and <code>"linguistic rights"</code>, set Deliver to <strong>RSS feed</strong>,
+  copy the URLs and paste them into the <code>GOOGLE_ALERT_URLS</code> array at the top of this file's code.
+</div>
+
+<div class="filter-bar">
+  <span class="flabel">Filter:</span>
+  <button class="fpill active" data-f="all"     onclick="applyFilter('all')">All</button>
+  <button class="fpill"        data-f="arxiv"   onclick="applyFilter('arxiv')"><span class="fdot" style="background:var(--c-arxiv)"></span>arXiv</button>
+  <button class="fpill"        data-f="scholar" onclick="applyFilter('scholar')"><span class="fdot" style="background:var(--c-scholar)"></span>Semantic Scholar</button>
+  <button class="fpill"        data-f="ldc"     onclick="applyFilter('ldc')"><span class="fdot" style="background:var(--c-ldc)"></span>LD&amp;C Journal</button>
+  <button class="fpill"        data-f="alerts"  onclick="applyFilter('alerts')"><span class="fdot" style="background:var(--c-alerts)"></span>Google Alerts</button>
+</div>
+
+<div id="stats" class="stats-bar" style="display:none">
+  <span class="stat"><strong id="stat-n">0</strong> results</span>
+  <span class="stat" id="stat-time"></span>
+</div>
+
+<div id="loading"></div>
+<div id="results"></div>
+
+<script>
+// ── Configuration ─────────────────────────────────────────────────
+// Paste your Google Alerts RSS feed URLs here once created
+const GOOGLE_ALERT_URLS = [
+  'https://www.google.com/alerts/feeds/15443979847171617592/8896134393048887107',
+  'https://www.google.com/alerts/feeds/15443979847171617592/8896134393048883797',
+];
+
+const MAX = 10; // max results per source
+const CORS = 'https://api.rss2json.com/v1/api.json?rss_url=';
+
+const SRC_META = {
+  arxiv:   { label: 'arXiv',            color: 'var(--c-arxiv)'   },
+  scholar: { label: 'Semantic Scholar', color: 'var(--c-scholar)' },
+  ldc:     { label: 'LD&C Journal',     color: 'var(--c-ldc)'     },
+  alerts:  { label: 'Google Alerts',    color: 'var(--c-alerts)'  },
+};
+
+let allItems = [];
+let activeFilter = 'all';
+
+// ── Helpers ───────────────────────────────────────────────────────
+function esc(s) {
+  return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function addItems(newItems) {
+  const seen = new Set(allItems.map(i => i.title.toLowerCase().trim()));
+  allItems = allItems.concat(newItems.filter(i => i.title && !seen.has(i.title.toLowerCase().trim())));
+  allItems.sort((a,b) => (b.date||new Date(0)) - (a.date||new Date(0)));
+  renderResults();
+}
+function showLoad(key) {
+  const m = SRC_META[key];
+  const el = document.createElement('div');
+  el.className = 'loading-row'; el.id = 'ld-' + key;
+  el.innerHTML = '<span class="spinner"></span><span class="sdot" style="background:' + m.color + '"></span><span>Loading ' + m.label + '&hellip;</span>';
+  document.getElementById('loading').appendChild(el);
+}
+function hideLoad(key) {
+  const el = document.getElementById('ld-' + key);
+  if (el) el.remove();
+}
+
+// ── Render ────────────────────────────────────────────────────────
+function renderResults() {
+  const filtered = activeFilter === 'all' ? allItems : allItems.filter(i => i.source === activeFilter);
+  const wrap = document.getElementById('results');
+  if (!filtered.length) {
+    wrap.innerHTML = '<div class="empty">Loading&hellip;</div>';
+    return;
+  }
+  document.getElementById('stats').style.display = 'flex';
+  document.getElementById('stat-n').textContent = filtered.length;
+  document.getElementById('stat-time').textContent = 'Updated ' + new Date().toLocaleTimeString('en-GB', {hour:'2-digit',minute:'2-digit'});
+  wrap.innerHTML = '<div class="results">' + filtered.map((item, idx) => {
+    const m = SRC_META[item.source] || { label: item.source, color: '#999' };
+    const d = item.date ? item.date.toLocaleDateString('en-GB', {day:'numeric',month:'short',year:'numeric'}) : '';
+    return '<a class="rcard" href="' + esc(item.link) + '" target="_blank" rel="noopener" style="animation-delay:' + (idx*25) + 'ms">'
+      + '<div class="rcard-top"><span class="rsrc"><span class="sdot" style="background:' + m.color + '"></span>' + m.label + '</span><span class="rdate">' + d + '</span></div>'
+      + '<div class="rtitle">' + esc(item.title) + '</div>'
+      + (item.authors ? '<div class="rauthors">' + esc(item.authors) + '</div>' : '')
+      + (item.abstract ? '<div class="rabstract">' + esc(item.abstract) + '</div>' : '')
+      + '<div class="rfoot"><span class="rjournal">' + esc(item.journal) + '</span><span class="rarrow">Read &rarr;</span></div>'
+      + '</a>';
+  }).join('') + '</div>';
+}
+
+function applyFilter(f) {
+  activeFilter = f;
+  document.querySelectorAll('.fpill').forEach(p => p.classList.toggle('active', p.dataset.f === f));
+  renderResults();
+}
+
+// ── Fetch: arXiv ──────────────────────────────────────────────────
+async function fetchArxiv() {
+  const q = 'linguicide+OR+%22linguistic+rights%22+OR+%22language+endangerment%22+OR+%22language+death%22';
+  const url = 'https://export.arxiv.org/api/query?search_query=all:' + q + '&sortBy=submittedDate&sortOrder=descending&max_results=' + MAX;
+  try {
+    const r = await fetch(url);
+    const text = await r.text();
+    const xml = new DOMParser().parseFromString(text, 'application/xml');
+    return Array.from(xml.querySelectorAll('entry')).map(e => ({
+      title:    (e.querySelector('title')?.textContent || '').trim(),
+      link:     (e.querySelector('id')?.textContent || '').trim(),
+      date:     e.querySelector('published')?.textContent ? new Date(e.querySelector('published').textContent) : null,
+      authors:  Array.from(e.querySelectorAll('author name')).slice(0,3).map(a => a.textContent).join(', '),
+      abstract: (e.querySelector('summary')?.textContent || '').trim().slice(0, 280),
+      journal:  'arXiv preprint',
+      source:   'arxiv'
+    }));
+  } catch(e) { return []; }
+}
+
+// ── Fetch: Semantic Scholar ───────────────────────────────────────
+async function fetchSemanticScholar() {
+  const items = [];
+  for (const q of ['linguicide', 'linguistic rights', 'language endangerment policy']) {
+    try {
+      const url = 'https://api.semanticscholar.org/graph/v1/paper/search?query='
+        + encodeURIComponent(q)
+        + '&fields=title,authors,year,abstract,venue,externalIds&limit=6';
+      const r = await fetch(url, { headers: { 'Accept': 'application/json' } });
+      if (!r.ok) continue;
+      const data = await r.json();
+      (data.data || []).forEach(p => {
+        const ext = p.externalIds || {};
+        const link = ext.DOI ? 'https://doi.org/' + ext.DOI
+          : ext.ArXiv ? 'https://arxiv.org/abs/' + ext.ArXiv
+          : 'https://www.semanticscholar.org/paper/' + p.paperId;
+        items.push({
+          title:    p.title || '',
+          link,
+          date:     p.year ? new Date(p.year + '-06-01') : null,
+          authors:  (p.authors||[]).slice(0,3).map(a => a.name).join(', ') + ((p.authors||[]).length > 3 ? ' et al.' : ''),
+          abstract: (p.abstract || '').slice(0, 280),
+          journal:  p.venue || 'Academic paper',
+          source:   'scholar'
+        });
+      });
+    } catch(e) { /* skip */ }
+  }
+  return items;
+}
+
+// ── Fetch: RSS (LD&C + Google Alerts) ────────────────────────────
+async function fetchRSS(url, sourceKey) {
+  try {
+    const r = await fetch(CORS + encodeURIComponent(url));
+    const data = await r.json();
+    if (!data.items) return [];
+    return data.items.slice(0, MAX).map(item => {
+      const div = document.createElement('div');
+      div.innerHTML = item.description || '';
+      return {
+        title:    item.title || '',
+        link:     item.link || '',
+        date:     item.pubDate ? new Date(item.pubDate) : null,
+        authors:  item.author || '',
+        abstract: div.textContent.trim().slice(0, 280),
+        journal:  SRC_META[sourceKey]?.label || sourceKey,
+        source:   sourceKey
+      };
+    });
+  } catch(e) { return []; }
+}
+
+// ── Init ──────────────────────────────────────────────────────────
+async function init() {
+  if (!GOOGLE_ALERT_URLS.length) document.getElementById('alerts-notice').style.display = 'block';
+
+  // arXiv
+  showLoad('arxiv');
+  addItems(await fetchArxiv());
+  hideLoad('arxiv');
+
+  // Semantic Scholar
+  showLoad('scholar');
+  addItems(await fetchSemanticScholar());
+  hideLoad('scholar');
+
+  // LD&C Journal RSS
+  showLoad('ldc');
+  const ldcItems = await fetchRSS(
+    'https://scholarspace.manoa.hawaii.edu/feed/rss_2.0/0b0d670d-732b-4e16-b7a7-5a713f16a6f0',
+    'ldc'
+  );
+  hideLoad('ldc');
+  addItems(ldcItems);
+
+  // Google Alerts
+  for (const url of GOOGLE_ALERT_URLS) {
+    showLoad('alerts');
+    addItems(await fetchRSS(url, 'alerts'));
+    hideLoad('alerts');
+  }
+
+  if (!allItems.length) {
+    document.getElementById('results').innerHTML = '<div class="empty">Nothing loaded &mdash; sources may be temporarily unavailable. Try refreshing.</div>';
+  }
+}
+
+init();
+</script>
+</body>
+</html>
