@@ -8,6 +8,8 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/globe.gl@2.27.0/dist/globe.gl.min.js"></script>
 <style>
 :root {
   --bg: #FAFAF8;
@@ -240,10 +242,31 @@ section.sb { padding:14px 16px; border-bottom:1px solid var(--line); }
 </style>
 </head>
 <body>
+<div id="globe-intro">
+  <div class="globe-title">Language Loss</div>
+  <div id="globe-container"></div>
+  <div class="globe-stats">
+    <div>
+      <div class="globe-stat-num">4,694</div>
+      <div class="globe-stat-label">endangered languages</div>
+    </div>
+    <div>
+      <div class="globe-stat-num">40%</div>
+      <div class="globe-stat-label">of all languages</div>
+    </div>
+    <div>
+      <div class="globe-stat-num">2</div>
+      <div class="globe-stat-label">lost every month</div>
+    </div>
+  </div>
+  <button class="globe-enter-btn" onclick="enterMap()">Explore the map &rarr;</button>
+  <div class="globe-subtitle">Data: Glottolog 5.2 + UNESCO Atlas</div>
+</div>
+
 <div class="app">
 
 <header>
-  <span class="h-title">LANGUAGE LOSS</span>
+  <span class="h-title">LANGUAGE LOSS</span><a href="https://www.linguicide.com" target="_blank" rel="noopener" style="font-size:11px;color:var(--muted);letter-spacing:-0.01em;text-decoration:none;border-bottom:1px solid rgba(0,0,0,0.15);padding-bottom:1px;transition:color 0.15s;" onmouseover="this.style.color='var(--ink)'" onmouseout="this.style.color='var(--muted)'">Learn more about linguicide &rarr;</a>
   <div class="h-right">
     <div class="pill" id="official-pill" style="flex-direction:column;align-items:flex-start;gap:3px;padding:6px 12px;min-width:180px;">
       <div style="display:flex;align-items:center;gap:6px;width:100%;">
@@ -670,6 +693,48 @@ searchInput.addEventListener('keydown', function(e) {
 document.addEventListener('click', function(e) {
   if (!e.target.closest('#search-input') && !e.target.closest('#search-results'))
     searchResultsEl.style.display='none';
+});
+
+
+// ── Globe intro ───────────────────────────────────────────────────────
+function initGlobe() {
+  const Globe = window.Globe;
+  if (!Globe) return;
+
+  const globe = Globe()
+    .globeImageUrl('https://unpkg.com/three-globe/example/img/earth-night.jpg')
+    .bumpImageUrl('https://unpkg.com/three-globe/example/img/earth-topology.png')
+    .backgroundImageUrl('https://unpkg.com/three-globe/example/img/night-sky.png')
+    .showAtmosphere(true)
+    .atmosphereColor('rgba(100,150,255,0.15)')
+    .atmosphereAltitude(0.15)
+    .width(500)
+    .height(500)
+    (document.getElementById('globe-container'));
+
+  // Auto-rotate
+  globe.controls().autoRotate = true;
+  globe.controls().autoRotateSpeed = 0.6;
+  globe.controls().enableZoom = false;
+  globe.controls().enablePan = false;
+
+  // Point of view — start over Europe/Africa
+  globe.pointOfView({ lat: 20, lng: 10, altitude: 2.2 });
+}
+
+function enterMap() {
+  const intro = document.getElementById('globe-intro');
+  intro.classList.add('fade-out');
+  setTimeout(function() {
+    intro.style.display = 'none';
+    // Force map to recalculate size now it's visible
+    if (window.map) map.invalidateSize();
+  }, 850);
+}
+
+// Init globe after page loads
+window.addEventListener('load', function() {
+  initGlobe();
 });
 
 // ── Official status — static curated data, no API calls ─────────────
